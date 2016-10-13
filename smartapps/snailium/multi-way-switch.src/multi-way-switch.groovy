@@ -25,92 +25,92 @@ definition(
 
 
 preferences {
-	section("Choose switches to group one multi-way switch.") {
-    	paragraph "Generally, if the device is a physically operable dimmer switch, select it in both category. If it is a virtual dimmer (e.g. light bulb), select only in 'dimmers' category."
-		input name: "switches", type: "capability.switch",      title: "Select Switches", multiple: true, required: false
+    section("Choose switches to group one multi-way switch.") {
+        paragraph "Generally, if the device is a physically operable dimmer switch, select it in both category. If it is a virtual dimmer (e.g. light bulb), select only in 'dimmers' category."
+        input name: "switches", type: "capability.switch",      title: "Select Switches", multiple: true, required: false
         input name: "dimmers",  type: "capability.switchLevel", title: "Select Dimmers",  multiple: true, required: false
         input name: "dimonoff", type: "bool",                   title: "Use 'dim max/min' to 'turn on/off' a dimmer switch.", description: "Useful if the switch's ramp up rate is not configurable."
-	}
+    }
 }
 
 def installed() {
-	log.debug "Installed with settings: ${settings}"
+    log.debug "Installed with settings: ${settings}"
 
-	initialize()
+    initialize()
 }
 
 def updated() {
-	log.debug "Updated with settings: ${settings}"
+    log.debug "Updated with settings: ${settings}"
 
-	unsubscribe()
-	initialize()
+    unsubscribe()
+    initialize()
 }
 
 def initialize() {
-   	subscribe(switches, "switch", switchesHandler)
-   	subscribe(dimmers, "level",  dimmersHandler)
-    
+    subscribe(switches, "switch", switchesHandler)
+    subscribe(dimmers, "level",  dimmersHandler)
+
     state.silent = []
 }
 
 def switchesHandler(evt) {
-	def evtSource = evt.source
-	def evtDevice = evt.device
+    def evtSource = evt.source
+    def evtDevice = evt.device
     def swTarget = evt.value
     def dimLevel = (swTarget == "on") ? 99 : 0;
-    
-	if(!state.silent.contains(evt.device.id)) {
-		log.debug "Process event '${evt.value}' from ${evtDevice.displayName} (${evt.source})"
-    	def effectiveSwitches = [];
+
+    if(!state.silent.contains(evt.device.id)) {
+        log.debug "Process event '${evt.value}' from ${evtDevice.displayName} (${evt.source})"
+        def effectiveSwitches = [];
         def effectiveDimmers = [];
         
         if(dimonoff == true) {
-        	switches.each({ sw -> if(sw.id  != evt.device.id && !deviceInList(sw, dimmers) && sw.currentValue("switch") != evt.value) effectiveSwitches.add(sw) })
+            switches.each({ sw -> if(sw.id  != evt.device.id && !deviceInList(sw, dimmers) && sw.currentValue("switch") != evt.value) effectiveSwitches.add(sw) })
             dimmers.each({ dim -> if(dim.id != evt.device.id && dim.currentValue("level").toInteger() != dimLevel) effectiveDimmers.add(dim) })
         } else {
-        	switches.each({ sw -> if(sw.id  != evt.device.id && sw.currentValue("switch") != evt.value) effectiveSwitches.add(sw) })
+            switches.each({ sw -> if(sw.id  != evt.device.id && sw.currentValue("switch") != evt.value) effectiveSwitches.add(sw) })
             dimmers.each({ dim -> if(dim.id != evt.device.id && !deviceInList(dim, switches) && dim.currentValue("level").toInteger() != dimLevel) effectiveDimmers.add(dim) })
         }
-        
+
         state.silent = [];
         if(effectiveSwitches != null && effectiveSwitches.size() > 0)
-        	state.silent = state.silent + effectiveSwitches.id;
+            state.silent = state.silent + effectiveSwitches.id;
         if(effectiveDimmers  != null && effectiveDimmers.size() > 0)
-        	state.silent = state.silent + effectiveDimmers.id;
+            state.silent = state.silent + effectiveDimmers.id;
         log.debug "Device ${state.silent} are put into silence mode."
-        
+
         operateSwitchDimmer(effectiveSwitches, swTarget, effectiveDimmers, dimLevel)
     } else {
-		log.debug "Process event '${evt.value}' from ${evtDevice.displayName} (${evt.source}) since device is silenced"
-    	state.silent.remove(evt.device.id);
+        log.debug "Process event '${evt.value}' from ${evtDevice.displayName} (${evt.source}) since device is silenced"
+        state.silent.remove(evt.device.id);
     }
 }
 
 def dimmersHandler(evt) {
-	def evtSource = evt.source
+    def evtSource = evt.source
     def evtDevice = evt.device
     def dimLevel = evt.value.toInteger()
     def swTarget = (dimLevel == 0) ? "off" : "on"
-    
-	if(!state.silent.contains(evt.device.id)) {
-		log.debug "Process event '${evt.value}' from ${evtDevice.displayName} (${evt.source})"
-    	def effectiveSwitches = [];
+
+    if(!state.silent.contains(evt.device.id)) {
+        log.debug "Process event '${evt.value}' from ${evtDevice.displayName} (${evt.source})"
+        def effectiveSwitches = [];
         def effectiveDimmers = [];
-        
-       	switches.each({ sw -> if(sw.id  != evt.device.id && !deviceInList(sw, dimmers) && sw.currentValue("switch") != evt.value) effectiveSwitches.add(sw) })
+
+        switches.each({ sw -> if(sw.id  != evt.device.id && !deviceInList(sw, dimmers) && sw.currentValue("switch") != evt.value) effectiveSwitches.add(sw) })
         dimmers.each({ dim -> if(dim.id != evt.device.id && dim.currentValue("level").toInteger() != dimLevel) effectiveDimmers.add(dim) })
 
-		state.silent = [];
+        state.silent = [];
         if(effectiveSwitches != null && effectiveSwitches.size() > 0)
-        	state.silent = state.silent + effectiveSwitches.id;
+            state.silent = state.silent + effectiveSwitches.id;
         if(effectiveDimmers  != null && effectiveDimmers.size() > 0)
-        	state.silent = state.silent + effectiveDimmers.id;
+            state.silent = state.silent + effectiveDimmers.id;
         log.debug "Device ${state.silent} are put into silence mode."
-        
+
         operateSwitchDimmer(effectiveSwitches, swTarget, effectiveDimmers, dimLevel)
     } else {
-		log.debug "Process event '${evt.value}' from ${evtDevice.displayName} (${evt.source}) since device is silenced"
-    	state.silent.remove(evt.device.id);
+        log.debug "Process event '${evt.value}' from ${evtDevice.displayName} (${evt.source}) since device is silenced"
+        state.silent.remove(evt.device.id);
     }
 }
 
@@ -135,10 +135,10 @@ def operateSwitchDimmer(listOfSwitches, switchTarget, listOfDimmers, dimLevel) {
 }
 
 def deviceInList(device, listOfDevices) {
-	if(listOfDevices != null && listOfDevices.size() > 0) {
-    	for(dev in listOfDevices)
-        	if(dev.id == device.id)
-            	return true
+    if(listOfDevices != null && listOfDevices.size() > 0) {
+        for(dev in listOfDevices)
+            if(dev.id == device.id)
+                return true
     }
     return false;
 }
